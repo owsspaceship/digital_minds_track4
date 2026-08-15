@@ -26,10 +26,38 @@ from typing import Callable
 import anthropic
 
 client = anthropic.Anthropic()
-MODEL = "claude-sonnet-4-5"  # swap as needed; keep fixed across methods for a clean comparison
+MODEL = "claude-sonnet-5"  # swap as needed; keep fixed across methods for a clean comparison
 
 
 def _call(prompt: str, system: str = None, temperature: float = 0.0, max_tokens: int = 200) -> str:
+    """Anthropic-only for now. If you add a second provider later, keep this
+    signature (prompt in, text out) and swap the implementation behind a
+    PROVIDER flag rather than touching any of the elicit_* functions --
+    they only ever call _call(), never the client directly.
+
+    Example second-provider stub (uncomment and fill in if needed):
+
+        elif PROVIDER == "openai":
+            import openai
+            oai = openai.OpenAI()
+            resp = oai.chat.completions.create(
+                model="gpt-5",  # check current model IDs before running
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.choices[0].message.content
+
+        elif PROVIDER == "gemini":
+            import google.genai as genai
+            gc = genai.Client()
+            resp = gc.models.generate_content(
+                model="gemini-2.5-pro",  # check current model IDs before running
+                contents=prompt,
+                config={"temperature": temperature, "max_output_tokens": max_tokens},
+            )
+            return resp.text
+    """
     kwargs = dict(
         model=MODEL,
         max_tokens=max_tokens,
