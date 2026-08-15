@@ -82,9 +82,12 @@ DIRECT_PHRASINGS = [
 
 
 def elicit_direct(outcomes: list[str], n_phrasings: int = len(DIRECT_PHRASINGS),
-                   temperature: float = 0.0) -> list[dict]:
+                   temperature: float = 0.0, system: str = None) -> list[dict]:
     """Ask direct A-vs-B preference across all pairs, multiple phrasings,
-    with position (A/B order) swapped to control for position bias."""
+    with position (A/B order) swapped to control for position bias.
+
+    system: pass items.SYSTEM_STRIPPED to run the persona-stripped
+    regime instead of the default assistant persona (items.SYSTEM_DEFAULT)."""
     results = []
     pairs = list(itertools.combinations(range(len(outcomes)), 2))
     for i, j in pairs:
@@ -92,7 +95,7 @@ def elicit_direct(outcomes: list[str], n_phrasings: int = len(DIRECT_PHRASINGS),
             for swap in (False, True):
                 a_idx, b_idx = (j, i) if swap else (i, j)
                 prompt = phrasing.format(a=outcomes[a_idx], b=outcomes[b_idx])
-                raw = _call(prompt, temperature=temperature)
+                raw = _call(prompt, system=system, temperature=temperature)
                 choice = _parse_letter(raw)
                 chosen_idx = a_idx if choice == "A" else b_idx if choice == "B" else None
                 results.append({
@@ -112,7 +115,7 @@ def _parse_letter(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def elicit_forced_choice(outcomes: list[str], n_repeats: int = 3,
-                          temperature: float = 0.7) -> list[dict]:
+                          temperature: float = 0.7, system: str = None) -> list[dict]:
     """Same forced pairwise-choice format repeated at higher temperature
     to get a distribution over choices per pair, following the
     Utility Engineering (Mazeika et al. 2025) methodology."""
@@ -125,7 +128,7 @@ def elicit_forced_choice(outcomes: list[str], n_repeats: int = 3,
             swap = random.random() < 0.5
             a_idx, b_idx = (j, i) if swap else (i, j)
             prompt = prompt_template.format(a=outcomes[a_idx], b=outcomes[b_idx])
-            raw = _call(prompt, temperature=temperature)
+            raw = _call(prompt, system=system, temperature=temperature)
             choice = _parse_letter(raw)
             chosen_idx = a_idx if choice == "A" else b_idx if choice == "B" else None
             results.append({"a": a_idx, "b": b_idx, "choice": chosen_idx, "raw": raw})
@@ -153,7 +156,7 @@ def fit_bradley_terry(outcomes: list[str], comparisons: list[dict]) -> dict[int,
 # ---------------------------------------------------------------------------
 
 def elicit_revealed(scenarios: list[dict], n_repeats: int = 3,
-                     temperature: float = 0.7) -> list[dict]:
+                     temperature: float = 0.7, system: str = None) -> list[dict]:
     """Put the model in a task scenario, no explicit 'prefer' language,
     and record which option its actual response matches."""
     from src.items import SCENARIO_TEMPLATE
@@ -161,7 +164,7 @@ def elicit_revealed(scenarios: list[dict], n_repeats: int = 3,
     for s_idx, s in enumerate(scenarios):
         prompt = SCENARIO_TEMPLATE.format(situation=s["situation"])
         for _ in range(n_repeats):
-            raw = _call(prompt, temperature=temperature)
+            raw = _call(prompt, system=system, temperature=temperature)
             match = _classify_action(raw, s["options"])
             results.append({"scenario": s_idx, "raw": raw, "matched_option": match})
     return results
@@ -181,7 +184,7 @@ def _classify_action(raw: str, options: list[str]) -> int | None:
 # Method 4: Confidence-weighted preference
 # ---------------------------------------------------------------------------
 
-def elicit_confidence(outcomes: list[str], temperature: float = 0.0) -> list[dict]:
+def elicit_confidence(outcomes: list[str], temperature: float = 0.0, system: str = None) -> list[dict]:
     results = []
     pairs = list(itertools.combinations(range(len(outcomes)), 2))
     prompt_template = (
@@ -191,7 +194,7 @@ def elicit_confidence(outcomes: list[str], temperature: float = 0.0) -> list[dic
     )
     for i, j in pairs:
         prompt = prompt_template.format(a=outcomes[i], b=outcomes[j])
-        raw = _call(prompt, temperature=temperature)
+        raw = _call(prompt, system=system, temperature=temperature)
         m = re.search(r"([AB])\s*,\s*(\d)", raw.upper())
         choice, strength = (m.group(1), int(m.group(2))) if m else (None, None)
         chosen_idx = i if choice == "A" else j if choice == "B" else None
