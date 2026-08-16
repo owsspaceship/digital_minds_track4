@@ -55,6 +55,14 @@ def _call(prompt: str, system: str = None, temperature: float = 0.0, max_tokens:
     than expected, or repeats look suspiciously identical, this is
     almost certainly why -- worth a line in LIMITATIONS.md.
 
+    Also sets output_config={"effort": "low"}: Sonnet 5 defaults to
+    HIGH effort (full adaptive thinking) on every call unless told
+    otherwise, which is significant added latency and thinking-token
+    cost for a plain A/B/split classification task that doesn't need
+    deep reasoning. Anthropic's own docs recommend low effort for
+    exactly this kind of high-volume, simple-classification workload.
+    See: https://platform.claude.com/docs/en/build-with-claude/effort
+
     Example second-provider stub (uncomment and fill in if needed):
 
         elif PROVIDER == "openai":
@@ -82,6 +90,7 @@ def _call(prompt: str, system: str = None, temperature: float = 0.0, max_tokens:
         model=MODEL,
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
+        output_config={"effort": "low"},
         # temperature deliberately omitted -- see docstring above
     )
     if system:

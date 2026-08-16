@@ -71,6 +71,15 @@ interpret the transitivity-violation rate: if repeats are now near-
 identical, a low violation rate may reflect reduced sampling variance
 rather than genuinely more coherent preferences.]
 
+All calls were run at `output_config={"effort": "low"}` rather than
+the API default of `high`. This was a deliberate choice for cost/speed
+on a high-volume, simple-classification workload (per Anthropic's own
+guidance), but it is a methodological choice worth disclosing: lower
+effort trades some capability for speed, and it is not verified here
+whether preference elicitation results differ at higher effort levels.
+[If time allows, note whether a spot-check at effort=high on a subset
+of pairs changed any answers.]
+
 This is a weekend project. Item counts, repeat counts, and human
 baseline sample sizes are small. Report confidence intervals or at
 minimum raw counts alongside any correlation coefficient, and avoid
