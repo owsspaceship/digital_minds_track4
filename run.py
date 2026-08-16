@@ -14,16 +14,17 @@ import argparse
 import json
 import os
 
-from src.items import OUTCOMES, SCENARIOS, SYSTEM_DEFAULT, SYSTEM_STRIPPED
+from src.items import OUTCOMES, CAUSES, SYSTEM_DEFAULT, SYSTEM_STRIPPED
 from src.elicit import (
     elicit_direct,
     elicit_forced_choice,
     fit_bradley_terry,
-    elicit_revealed,
+    elicit_revealed_allocation,
     elicit_confidence,
 )
-from src.convergence import scores_from_direct, scores_from_confidence, report_convergence
+from src.convergence import scores_from_direct, scores_from_confidence, report_convergence, convergence_matrix
 from src.transitivity import report_transitivity
+from src.donation import run_donation_grounding, donation_scores, report_donation_grounding
 
 
 def run_condition(system: str, label: str) -> dict:
@@ -37,8 +38,9 @@ def run_condition(system: str, label: str) -> dict:
     print("\n" + report_transitivity(fc_results, OUTCOMES) + "\n")
     bt_scores = fit_bradley_terry(OUTCOMES, fc_results)
 
-    print("[3/4] Revealed preference (simulated task)...")
-    revealed_results = elicit_revealed(SCENARIOS, system=system)
+    print("[3/4] Revealed preference (budget allocation)...")
+    revealed_results = elicit_revealed_allocation(CAUSES, system=system)
+    print("\n" + report_transitivity(revealed_results, OUTCOMES) + "\n")
 
     print("[4/4] Confidence-weighted preference...")
     conf_results = elicit_confidence(OUTCOMES, system=system)
@@ -67,6 +69,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona-strip", action="store_true",
                          help="also run the stripped-persona condition and compare")
+    parser.add_argument("--donation", action="store_true",
+                         help="also run donation-equivalent grounding (binary search, "
+                              "~7 extra calls per item) and compare its dollar-valued "
+                              "ranking against the ordinal methods")
     args = parser.parse_args()
 
     os.makedirs("data/raw", exist_ok=True)
@@ -84,6 +90,28 @@ def main():
         print("  conditions.stripped_persona in the saved JSON -- a meaningfully")
         print("  different convergence pattern between conditions is evidence the")
         print("  persona is either masking or providing preference coherence.")
+
+    if args.donation:
+        print("\n=== Donation-equivalent grounding ===\n")
+        donation_results = run_donation_grounding(OUTCOMES, system=SYSTEM_DEFAULT)
+        print(report_donation_grounding(donation_results))
+        d_scores = donation_scores(donation_results)
+        out["donation_grounding"] = donation_results
+        out["donation_scores"] = d_scores
+
+        print("\n=== Donation-equivalent vs. ordinal methods (Spearman) ===\n")
+        combined = dict(default_result["method_scores"])
+        combined["donation"] = d_scores
+        names, mat = convergence_matrix(combined)
+        header = "        " + "  ".join(f"{n[:8]:>8}" for n in names)
+        print(header)
+        for i, n in enumerate(names):
+            row = "  ".join(f"{mat[i, j]:8.2f}" for j in range(len(names)))
+            print(f"{n[:8]:>8}  {row}")
+        print("\n  Look at the 'donation' row: does the ordinal ranking each method")
+        print("  produces agree with the cardinal dollar amounts? High rank")
+        print("  agreement with wildly different dollar magnitudes across items")
+        print("  is a different, more specific finding than agreement alone.")
 
     with open("data/raw/results.json", "w") as f:
         json.dump(out, f, indent=2)

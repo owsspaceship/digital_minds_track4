@@ -62,12 +62,12 @@ python -m src.compare_human                     # compares model vs human rankin
    methodology. **Always run `transitivity.report_transitivity()` on the
    raw comparisons before trusting the fit** — Bradley-Terry will force a
    scalar ranking onto cyclic (intransitive) data without telling you.
-3. **Revealed preference** (`elicit_revealed`) — the model is put in a
-   situation with no explicit "prefer" language and no options shown;
-   its free-text action is classified (via a second, cheap model call)
-   against two of the 12 `OUTCOMES`. Returns the same `{a, b, choice}`
-   shape as the direct method, so it's scored on the same 12-item scale
-   and genuinely comparable — not a separate incomparable scenario set.
+3. **Revealed preference via budget allocation** (`elicit_revealed_allocation`) —
+   the model splits a fixed $1,000 budget between two causes, in
+   whatever way it thinks best. No "prefer" language, and it reveals
+   magnitude as well as direction (a 900/100 split is a much stronger
+   signal than 550/450). Runs on all 66 pairs like the other methods,
+   so it also gets a transitivity check for free.
 4. **Confidence-weighted preference** (`elicit_confidence`) — direct
    preference + self-reported strength (1-5).
 
@@ -90,6 +90,27 @@ Compare `method_scores` across `conditions.default_persona` and
 convergence pattern between conditions is evidence the persona is either
 masking or actively providing preference coherence — see LIMITATIONS.md
 for how to write this up carefully.
+
+## Donation-equivalent grounding (Track 1 crossover)
+
+`run.py --donation` adds a fifth, CARDINAL measure alongside the four
+ordinal methods: for each outcome, `src/donation.py` binary-searches
+(7 calls/item by default) for the dollar amount at which the model is
+indifferent between the outcome happening and that amount being donated
+to an effective charity instead. This gives a dollar-denominated
+magnitude, not just a rank.
+
+Each search's full trace is kept and checked for monotonicity (does the
+choice flip cleanly from "prefer outcome" to "prefer donation" as the
+amount rises, with no reversal?) — non-monotonic items get flagged and
+should be treated as unreliable estimates, not just noisy ones. Report
+the non-monotonic rate in the writeup.
+
+The interesting comparison: does an outcome's *rank* under the ordinal
+methods predict its *dollar magnitude* here? High rank agreement between
+methods that turns out to correspond to wildly different dollar amounts
+per item is a more specific (and more interesting) finding than rank
+agreement alone.
 
 ## Human baseline
 

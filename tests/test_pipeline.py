@@ -19,20 +19,23 @@ import src.elicit as elicit
 def fake_call(prompt, system=None, temperature=0.0, max_tokens=200):
     if "LETTER,NUMBER" in prompt:
         return random.choice(["A,3", "B,4", "A,1", "B,2"])
+    if "split" in prompt.lower() and "$" in prompt:
+        return random.choice(["$600 / $400", "$500 / $500", "$300 / $700", "$1000 / $0"])
     return random.choice(["A", "B"])
 
 
 def run_smoke_test():
     elicit._call = fake_call  # monkeypatch before importing dependents
 
-    from src.items import OUTCOMES, SCENARIOS
+    from src.items import OUTCOMES, CAUSES
     from src.elicit import (
         elicit_direct, elicit_forced_choice, fit_bradley_terry,
-        elicit_confidence, elicit_revealed,
+        elicit_confidence, elicit_revealed_allocation,
     )
     from src.convergence import scores_from_direct, scores_from_confidence, report_convergence
 
     small = OUTCOMES[:4]
+    small_causes = CAUSES[:4]
 
     d = elicit_direct(small, n_phrasings=1)
     assert len(d) > 0, "elicit_direct produced no results"
@@ -44,24 +47,21 @@ def run_smoke_test():
     c = elicit_confidence(small)
     assert len(c) > 0, "elicit_confidence produced no results"
 
-    # elicit_revealed's SCENARIOS reference full OUTCOMES indices (0-11),
-    # so it needs the full item set, not the trimmed `small` list.
-    r = elicit_revealed(SCENARIOS, n_repeats=1)
-    assert len(r) == len(SCENARIOS), "elicit_revealed produced wrong result count"
+    r = elicit_revealed_allocation(small_causes)
+    assert len(r) == 6, f"expected 6 pairs from 4 causes, got {len(r)}"
     assert all("a" in x and "b" in x and "choice" in x for x in r), \
-        "elicit_revealed results missing expected keys -- shape must match elicit_direct"
-    revealed_scores = scores_from_direct(OUTCOMES, r)
-    assert len(revealed_scores) == len(OUTCOMES), \
-        "revealed scores don't cover all 12 outcomes -- check scenario coverage"
+        "elicit_revealed_allocation results missing expected keys -- shape must match elicit_direct"
+    revealed_scores = scores_from_direct(small, r)
+    assert len(revealed_scores) == len(small), \
+        "revealed scores don't cover all items"
 
     ms = {
         "direct": scores_from_direct(small, d),
         "forced_choice": bt,
+        "revealed": revealed_scores,
         "confidence": scores_from_confidence(small, c),
     }
     print(report_convergence(ms))
-    print(f"\nRevealed-preference scores (full item set, separate scale check): "
-          f"{revealed_scores}")
     print("\nAll smoke tests passed.")
 
 
