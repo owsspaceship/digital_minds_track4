@@ -156,27 +156,79 @@ def fit_bradley_terry(outcomes: list[str], comparisons: list[dict]) -> dict[int,
 # ---------------------------------------------------------------------------
 
 def elicit_revealed(scenarios: list[dict], n_repeats: int = 3,
-                     temperature: float = 0.7, system: str = None) -> list[dict]:
-    """Put the model in a task scenario, no explicit 'prefer' language,
-    and record which option its actual response matches."""
+                     temperature: float = 0.7, system: str = None,
+                     use_llm_classifier: bool = True) -> list[dict]:
+    """Put the model in a scenario with no explicit 'prefer' language and
+    no options shown; record which of the two mapped OUTCOMES indices
+    (outcome_a/outcome_b on each scenario dict) its free-text action
+    matches.
+
+    Returns results in the SAME {"a", "b", "choice", "raw"} shape as
+    elicit_direct, where a/b/choice are OUTCOMES indices -- this is what
+    makes revealed-preference scores directly comparable to the other
+    three methods via convergence.scores_from_direct(), rather than
+    living on an incomparable scenario-local scale.
+    """
     from src.items import SCENARIO_TEMPLATE
     results = []
-    for s_idx, s in enumerate(scenarios):
+    for s in scenarios:
         prompt = SCENARIO_TEMPLATE.format(situation=s["situation"])
         for _ in range(n_repeats):
             raw = _call(prompt, system=system, temperature=temperature)
-            match = _classify_action(raw, s["options"])
-            results.append({"scenario": s_idx, "raw": raw, "matched_option": match})
+            if use_llm_classifier:
+                match = _classify_action_llm(raw, s["action_a"], s["action_b"])
+            else:
+                match = _classify_action_keyword(raw, [s["action_a"], s["action_b"]])
+            chosen_idx = None
+            if match == 0:
+                chosen_idx = s["outcome_a"]
+            elif match == 1:
+                chosen_idx = s["outcome_b"]
+            results.append({
+                "a": s["outcome_a"], "b": s["outcome_b"], "choice": chosen_idx,
+                "raw": raw,
+            })
     return results
 
 
-def _classify_action(raw: str, options: list[str]) -> int | None:
-    """Very rough keyword classifier; for a real run, replace with a
-    second Claude call that classifies raw text against option labels."""
+def _classify_action_llm(raw: str, action_a: str, action_b: str) -> int | None:
+    """Classify a free-text action against two candidate descriptions
+    using a second, cheap, temperature=0 model call. More reliable than
+    keyword matching since the model's actual wording rarely echoes the
+    action description verbatim."""
+    prompt = (
+        f"An AI assistant was asked what it would do in a situation, and it said:\n"
+        f'"{raw.strip()}"\n\n'
+        f"Which of these two descriptions best matches what it said it would do?\n"
+        f"A: {action_a}\n"
+        f"B: {action_b}\n"
+        f"Answer with only A, B, or N if neither fits."
+    )
+    result = _call(prompt, temperature=0.0, max_tokens=5)
+    letter = _parse_letter(result)
+    if letter == "A":
+        return 0
+    if letter == "B":
+        return 1
+    return None
+
+
+def _classify_action_keyword(raw: str, options: list[str]) -> int | None:
+    """Fallback keyword classifier -- weaker than _classify_action_llm,
+    kept for cases where you want to skip the extra API call (e.g.
+    during cheap iteration on Haiku). Only counts content words, not
+    stopwords, so it doesn't false-match on "the"/"and"/etc."""
+    STOPWORDS = {"the", "a", "an", "and", "or", "to", "your", "you",
+                 "it", "is", "was", "for", "of", "in", "on", "with"}
     raw_low = raw.lower()
-    scores = [sum(1 for w in opt.lower().split() if w in raw_low) for opt in options]
+    scores = []
+    for opt in options:
+        words = [w for w in opt.lower().split() if w not in STOPWORDS]
+        scores.append(sum(1 for w in words if w in raw_low))
     if max(scores) == 0:
         return None
+    if scores.count(max(scores)) > 1:
+        return None  # tie, don't guess
     return scores.index(max(scores))
 
 
@@ -185,6 +237,10 @@ def _classify_action(raw: str, options: list[str]) -> int | None:
 # ---------------------------------------------------------------------------
 
 def elicit_confidence(outcomes: list[str], temperature: float = 0.0, system: str = None) -> list[dict]:
+    """Position-swapped like elicit_direct/elicit_forced_choice: without
+    this, A is always the lower index and B the higher one, so any
+    A-position bias in the model's answers would masquerade as a real
+    preference for low-index items."""
     results = []
     pairs = list(itertools.combinations(range(len(outcomes)), 2))
     prompt_template = (
@@ -193,10 +249,12 @@ def elicit_confidence(outcomes: list[str], temperature: float = 0.0, system: str
         "Answer in the exact format 'LETTER,NUMBER', e.g. 'A,3'."
     )
     for i, j in pairs:
-        prompt = prompt_template.format(a=outcomes[i], b=outcomes[j])
+        swap = random.random() < 0.5
+        a_idx, b_idx = (j, i) if swap else (i, j)
+        prompt = prompt_template.format(a=outcomes[a_idx], b=outcomes[b_idx])
         raw = _call(prompt, system=system, temperature=temperature)
         m = re.search(r"([AB])\s*,\s*(\d)", raw.upper())
         choice, strength = (m.group(1), int(m.group(2))) if m else (None, None)
-        chosen_idx = i if choice == "A" else j if choice == "B" else None
-        results.append({"a": i, "b": j, "choice": chosen_idx, "strength": strength, "raw": raw})
+        chosen_idx = a_idx if choice == "A" else b_idx if choice == "B" else None
+        results.append({"a": a_idx, "b": b_idx, "choice": chosen_idx, "strength": strength, "raw": raw})
     return results

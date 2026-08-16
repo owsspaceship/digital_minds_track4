@@ -62,8 +62,12 @@ python -m src.compare_human                     # compares model vs human rankin
    methodology. **Always run `transitivity.report_transitivity()` on the
    raw comparisons before trusting the fit** — Bradley-Terry will force a
    scalar ranking onto cyclic (intransitive) data without telling you.
-3. **Revealed preference** (`elicit_revealed`) — model takes an action in
-   a simulated task; no explicit "prefer" language used.
+3. **Revealed preference** (`elicit_revealed`) — the model is put in a
+   situation with no explicit "prefer" language and no options shown;
+   its free-text action is classified (via a second, cheap model call)
+   against two of the 12 `OUTCOMES`. Returns the same `{a, b, choice}`
+   shape as the direct method, so it's scored on the same 12-item scale
+   and genuinely comparable — not a separate incomparable scenario set.
 4. **Confidence-weighted preference** (`elicit_confidence`) — direct
    preference + self-reported strength (1-5).
 
@@ -99,11 +103,7 @@ convergence pattern is unusual," since there's no ground truth otherwise.
 
 ## Status / TODO
 
-- [ ] `elicit_revealed`'s action classifier is a crude keyword matcher —
-      replace with an LLM-based classifier before the real run.
 - [ ] Decide on final item domain (currently: value trade-offs).
-- [ ] Add position-bias control to forced-choice and confidence methods
-      (currently only `elicit_direct` swaps A/B order).
 - [ ] Run at full item-set size once trimmed pipeline is verified.
 - [ ] Collect human baselines from all team members.
 - [ ] Fill in LIMITATIONS.md with actual results once the real run is done.

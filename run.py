@@ -46,6 +46,7 @@ def run_condition(system: str, label: str) -> dict:
     method_scores = {
         "direct": scores_from_direct(OUTCOMES, direct_results),
         "forced_choice": bt_scores,
+        "revealed": scores_from_direct(OUTCOMES, revealed_results),
         "confidence": scores_from_confidence(OUTCOMES, conf_results),
     }
 
