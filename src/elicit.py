@@ -37,6 +37,24 @@ def _call(prompt: str, system: str = None, temperature: float = 0.0, max_tokens:
     PROVIDER flag rather than touching any of the elicit_* functions --
     they only ever call _call(), never the client directly.
 
+    IMPORTANT: `temperature` is accepted as a parameter here (kept for
+    method-level documentation of intended sampling behavior -- e.g.
+    elicit_forced_choice calling with temperature=0.7 signals "we want
+    varied repeats"), but it is NOT forwarded to the API call below.
+    As of Claude Sonnet 5 / Opus 4.7+, the API rejects any non-default
+    temperature/top_p/top_k with a 400 error -- adaptive thinking is on
+    by default and controls its own sampling internally, so external
+    temperature control is no longer supported. See:
+    https://platform.claude.com/docs/en/about-claude/models/whats-new-sonnet-5
+
+    Practical consequence for this project: repeated calls to the same
+    prompt (elicit_forced_choice, elicit_revealed_allocation with
+    n_repeats>1) may now show LESS variance than the temperature=0.7
+    argument implies, since we can no longer actually raise the
+    temperature. If your transitivity-check violation rate looks lower
+    than expected, or repeats look suspiciously identical, this is
+    almost certainly why -- worth a line in LIMITATIONS.md.
+
     Example second-provider stub (uncomment and fill in if needed):
 
         elif PROVIDER == "openai":
@@ -63,8 +81,8 @@ def _call(prompt: str, system: str = None, temperature: float = 0.0, max_tokens:
     kwargs = dict(
         model=MODEL,
         max_tokens=max_tokens,
-        temperature=temperature,
         messages=[{"role": "user", "content": prompt}],
+        # temperature deliberately omitted -- see docstring above
     )
     if system:
         kwargs["system"] = system

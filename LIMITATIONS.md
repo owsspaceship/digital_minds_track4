@@ -53,6 +53,29 @@ the same items, collected via src/human_baseline.py. Note the human
 sample size (almost certainly small -- team members only) and avoid
 over-generalizing from it.]
 
+## Sampling parameter constraints (Claude Sonnet 5 / Opus 4.7+)
+
+As of this model generation, the Anthropic API no longer accepts
+`temperature`, `top_p`, or `top_k` set to non-default values (adaptive
+thinking controls sampling internally instead). This project's methods
+were designed assuming temperature could be raised for repeated
+sampling (`elicit_forced_choice` and `elicit_revealed_allocation` both
+call with `temperature=0.7` to get a distribution across repeats), but
+that parameter is no longer forwarded to the API -- see the comment in
+`src/elicit.py:_call()`.
+
+[Report whether repeated calls to the same pair still showed
+meaningful variance without temperature control, or whether responses
+became more deterministic than intended. This directly affects how to
+interpret the transitivity-violation rate: if repeats are now near-
+identical, a low violation rate may reflect reduced sampling variance
+rather than genuinely more coherent preferences.]
+
+This is a weekend project. Item counts, repeat counts, and human
+baseline sample sizes are small. Report confidence intervals or at
+minimum raw counts alongside any correlation coefficient, and avoid
+overstating precision the data doesn't support.
+
 ## Sample size and statistical power
 
 This is a weekend project. Item counts, repeat counts, and human
